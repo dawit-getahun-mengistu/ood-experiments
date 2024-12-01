@@ -163,35 +163,40 @@ class OODDetection:
         # Train logistic regression
         scaler = StandardScaler().fit(X)
         X_scaled = scaler.transform(X)
-        clf = LogisticRegression().fit(X_scaled, y)
+        clf = LogisticRegression(random_state=42).fit(X_scaled, y)
 
-        # Get logistic regression decision scores (probabilities for OOD class)
-        decision_scores = clf.predict_proba(X_scaled)[:, 1]
+        # Get predictions and probabilities
+        predictions = clf.predict(X_scaled)
 
-        # Separate scores for in-distribution and out-of-distribution
-        in_scores = decision_scores[:len(in_embeddings)]
-        ood_scores = decision_scores[len(in_embeddings):]
+        # Separate results for in-distribution and out-of-distribution
+        in_predictions = predictions[:len(in_embeddings)]
+        ood_predictions = predictions[len(in_embeddings):]
 
-        # Calculate detection rates
-        in_detection_rate, ood_detection_rate = self.calculate_detection_rates(
-            in_scores, 0.5)
+        # Calculate metrics
+        in_detection_rate = (in_predictions == 0).mean()
+        ood_detection_rate = (ood_predictions == 1).mean()
+        ood_as_id = (ood_predictions == 0).sum()
+        ood_as_od = (ood_predictions == 1).sum()
 
-        # OOD classification breakdown
-        ood_as_id = (ood_scores < 0.5).sum()
-        ood_as_od = len(ood_scores) - ood_as_id
+        ood_as_id_percent = 100.0 * ood_as_id / len(ood_predictions)
+        ood_as_od_percent = 100.0 * ood_as_od / len(ood_predictions)
 
-        ood_as_id_percent = 100.0 * ood_as_id / len(ood_scores)
-        ood_as_od_percent = 100.0 * ood_as_od / len(ood_scores)
-
-        # Plot distributions
-        self.plot_score_distributions(in_scores, ood_scores, threshold=0.5)
-
-        print(
-            f"Logistic Regression OOD Detection: Decision Threshold = 0.50")
+        # Print results
+        print(f"Logistic Regression OOD Detection: Decision Threshold = 0.50")
         print(f"In-Distribution Detection Rate: {in_detection_rate:.2f}")
         print(f"Out-of-Distribution Detection Rate: {ood_detection_rate:.2f}")
         print(f"OOD samples classified as ID: {ood_as_id_percent:.2f}%")
         print(f"OOD samples classified as OD: {ood_as_od_percent:.2f}%")
+
+        # Plot distributions
+        probabilities = clf.predict_proba(X_scaled)[:, 1]
+        in_probs = probabilities[:len(in_embeddings)]
+        ood_probs = probabilities[len(in_embeddings):]
+        self.plot_score_distributions(
+            in_probs,
+            ood_probs,
+            # title="Logistic Regression Probability Distributions"
+        )
 
         return {
             "in_detection_rate": in_detection_rate,
